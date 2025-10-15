@@ -1,0 +1,9 @@
+---
+title: "Homework 6"
+format: html
+---
+
+## Task 1
+
+First, let's copy over the code from the zip file and turn it into a function:
+
