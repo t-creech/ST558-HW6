@@ -5,5 +5,260 @@ format: html
 
 ## Task 1
 
-First, let's copy over the code from the zip file and turn it into a function:
+Conceptual questions:
 
+1. The purpose of the ```lapply()``` function is to apply a function to  lists and obtain a list of objects that are a result of that function. The equivalent ```purr``` function to this function is the ```map()``` function.
+
+2. The correct way to code this would be: ```lapply(list, cor, method = "kendall")```. ```lapply``` will pass the third argument into the function in the second argument.
+
+3. The main advantage of using the ```purr``` family functions is being able to use the helpers which all for you to write compact code. Additionally, the ```purr``` family of functions are type stable meaning that R will not try to guess the type of the data. This is helpful since you always know the type for the output of the ```purr``` family functions and can therefore avoid errors.
+
+4. Side-effect functions are pipeable functions that perform an action like printing something but do not change and silently return the dataframe with ```invisible()```. This allows them to be used in piping together functions without returning the dataframe in the output. The example given in the notes is a function to count the number of rows in the dataframe. Silently returning the dataframe allows for you to use this function in piping so the input of the next function in the chain is the dataframe. 
+
+5. In a function, all of the variables are local and only exist within that function. This means that the scope of the variable name sd and the function sd are different. Within the function, the variable name sd masks the function sd but only within that function. It is due to R's environments and lexical scoping.
+
+## Task 2
+
+### Question 1
+
+First, we will write our RMSE function:
+
+```{R}
+get_RMSE <- function(y, y_hat, ...) {
+  squared_errors <- (y - y_hat)^2
+  rmse <- sqrt(mean(squared_errors, ...))
+  return(rmse)
+}
+```
+
+In this function, the ellipsis allows for the user of the function to pass in additional arguments that will be passed into the mean function, such as ```na.rm = TRUE```
+
+### Question 2
+
+Now that we have the function, we can run the code from the homework.
+
+```{R}
+set.seed(10)
+n <- 100
+x <- runif(n)
+resp <- 3 + 10 * x + rnorm(n)
+pred <- predict(lm(resp ~ x), data.frame(x))
+```
+
+Now, lets test our function
+
+```{R}
+rmse <- get_RMSE(resp, pred)
+rmse
+```
+
+Great! It looks to work. Now, let's replace two of the response values with NA.
+
+```{R}
+resp[5] <- NA_real_
+resp[55] <- NA_real_
+resp
+```
+
+Now that we replaced values at 5 and 55 in the response with NA. Let's test our RMSE function with and without a na.rm argument.
+
+```{R}
+rmse <- get_RMSE(resp, pred)
+print(rmse)
+
+rmse <- get_RMSE(resp, pred, na.rm = TRUE)
+print(rmse)
+```
+
+Here we can see the importance of the functionality to remove the NAs. If we do not, we will get NA as the result.
+
+### Question 3
+
+Now, we can do the same for MAE.
+
+```{R}
+get_MAE <- function(y, y_hat, ...){
+  absolute_error <- abs(y - y_hat)
+  mae <- mean(absolute_error, ...)
+  return(mae)
+}
+```
+
+### Question 4
+
+Now, we will run the code to get responses and predictions again.
+
+```{R}
+set.seed(10)
+n <- 100
+x <- runif(n)
+resp <- 3 + 10 * x + rnorm(n)
+pred <- predict(lm(resp ~ x), data.frame(x))
+```
+
+Let's test in the same way we did before:
+```{R}
+mae <- get_MAE(resp, pred)
+print(mae)
+
+# Replacing two with NA
+resp[5] <- NA_real_
+resp[55] <- NA_real_
+print(resp)
+
+# Test without na.rm
+mae <- get_MAE(resp, pred)
+print(mae)
+
+mae <- get_MAE(resp, pred, na.rm = TRUE)
+print(mae)
+```
+
+Perfect, everything behaved as expected.
+
+### Question 5
+
+Now, let's create the wrapper function described in the homework
+
+```{R}
+get_metrics <- function(y, y_hat, metrics = c("RMSE", "MAE"), ...) {
+  if (!(is.vector(y) && is.atomic(y) && is.numeric(y))) {
+    stop("`y` must be a numeric (atomic) vector.")
+  }
+  if (!(is.vector(y_hat) && is.atomic(y_hat) && is.numeric(y_hat))) {
+    stop("`yhat` must be a numeric (atomic) vector.")
+  }
+  results <- list()
+  if ("RMSE" %in% metrics) {
+    results$RMSE <- get_RMSE(y, y_hat, ...)
+  }
+  if ("MAE" %in% metrics) {
+    results$MAE <- get_MAE(y, y_hat, ...)
+  }
+  return(results)
+}
+```
+
+### Question 6
+
+Great, now let's generate our data.
+
+```{R}
+set.seed(10)
+n <- 100
+x <- runif(n)
+resp <- 3 + 10 * x + rnorm(n)
+pred <- predict(lm(resp ~ x), data.frame(x))
+```
+
+And now we test!
+```{R}
+mae <- get_metrics(resp, pred, "MAE")
+print(mae)
+rmse <- get_metrics(resp, pred, "RMSE")
+print(rmse)
+both <- get_metrics(resp, pred) #default behavior returns both
+print(both)
+```
+
+Great, it looks to work. Now, with NAs
+
+```{R}
+resp[5] <- NA_real_
+resp[55] <- NA_real_
+print(resp)
+
+mae <- get_metrics(resp, pred, "MAE")
+print(mae)
+mae <- get_metrics(resp, pred, "MAE", na.rm = TRUE)
+print(mae)
+rmse <- get_metrics(resp, pred, "RMSE")
+print(rmse)
+rmse <- get_metrics(resp, pred, "RMSE", na.rm = TRUE)
+print(rmse)
+both <- get_metrics(resp, pred) #default behavior returns both
+print(both)
+both <- get_metrics(resp, pred, na.rm = TRUE) #default behavior returns both
+print(both)
+```
+
+Again, everything works as expected. Now, what if we replace our data with a dataframe.
+
+```{R, error = TRUE}
+error <- get_metrics(iris, iris)
+```
+
+Perfect, we get the error we expected.
+
+## Task 3
+
+Let's create the list object first. We will also load in tidyverse.
+
+```{R}
+library(tidyverse)
+lm_fit1 <- lm(Sepal.Length ~ Sepal.Width + Species, data = iris)
+```
+
+### Question 1
+
+Let's pull out the coefficients using the three methods described in the homework
+
+```{R}
+# First method
+coef1 <- lm_fit1$coefficients
+print(coef1)
+coef2 <- coef(lm_fit1)
+print(coef2)
+coef3 <- lm_fit1 |> pluck("coefficients")
+print(coef3)
+```
+All three methods return the same coefficients as expected.
+
+### Question 2
+
+First, let's fit our models.
+
+```{R}
+lm_fit2 <- lm(Sepal.Length ~ Sepal.Width, data = iris)
+lm_fit3 <- lm(Sepal.Length ~ Petal.Width + Sepal.Width + Species, data = iris)
+lm_fit4 <- lm(Sepal.Length ~ Petal.Width + Petal.Length + Sepal.Width + Species,
+data = iris)
+fits <- list(lm_fit1, lm_fit2, lm_fit3, lm_fit4)
+```
+
+Now we can use a combo of pluck and map to pluck all of the coefficients from fits.
+
+```{R}
+fits |> map(pluck("coefficients"))
+```
+
+Perfect, it works as expected.
+
+### Question 3
+
+Now, we can us map to get confidence intervals as well.
+
+```{R}
+fits |> map(confint)
+```
+
+Great! Looks to have worked.
+
+### Question 4
+
+Now, let's aim to plot the residuals.
+
+```{R}
+par(mfrow = c(2, 2))
+fits |> map(residuals) |> walk(hist)
+```
+The plots look great! But the names are not too great.
+
+### Question 5
+
+Let's try to fix that!
+
+```{R}
+par(mfrow = c(2, 2))
+fits |> map(residuals) |> set_names(c("fit1", "fit2", "fit3", "fit4")) |> iwalk(\(x, y) hist(x, main = y))
+```
